@@ -1,0 +1,134 @@
+{% extends "layout.html" %}
+
+{% block title %}Scheduler{% endblock %}
+{% block header %}Scheduler{% endblock %}
+
+{% block scripts %}
+$(document).ready(function() {
+	// make the time/date picker
+	$('#date_picker').calendricalDate({ usa: true });
+	$('#time_picker').calendricalTime({ usa: true });
+
+	// attempt to see if the scheduler is running (?)
+	$.ajax({
+	  url: '/taskmanager/scheduler/check_service',
+	  success: function() {
+		$('#scheduler_check').html('running');
+	  },
+	  error: function() {
+	  	$('#scheduler_check').html('not running');
+	  }
+	});
+
+	// bind up form validation checker
+	$("form#scheduler_form").submit(function() {
+		var $date_picker = $("#date_picker");
+		var $time_picker = $("#time_picker");
+
+		if ($date_picker.val() == "" || $time_picker.val() == "") {
+			// show error message
+			if ($date_picker.val() == "")
+				$date_picker.addClass("invalid_field");
+			else
+				$date_picker.removeClass("invalid_field");
+
+			if ($time_picker.val() == "")
+				$time_picker.addClass("invalid_field");
+			else
+				$time_picker.removeClass("invalid_field");
+
+			return false;
+		}
+	});
+});
+
+function refreshForm() {
+	$("form#filter_form").submit();
+}
+{% endblock %}
+
+{% block content %}
+	<div class="header">&#149; scheduled tasks:</div>
+	<div class="section">
+		<div class="info_panel" style="line-height: 150%;">
+			<b>scheduler service:</b> <span id="scheduler_check">checking...</span><br />
+			<b>current time:</b> {{ current_time|date:"n/d/Y g:i A" }}
+			<form id="filter_form" action="{% url taskmanager.views.scheduler %}" method="GET">
+				<b>show tasks:</b>
+				<select id="task_filter" name="task_filter">
+					<option value="all_tasks"{% ifequal task_filter "all_tasks" %} selected="true"{% endifequal %}>all tasks</option>
+					<option value="pending_tasks"{% ifequal task_filter "pending_tasks" %} selected="true"{% endifequal %}>pending tasks</option>
+					<option value="due_tasks"{% ifequal task_filter "due_tasks" %} selected="true"{% endifequal %}>due tasks</option>
+					<option value="past_tasks"{% ifequal task_filter "past_tasks" %} selected="true"{% endifequal %}>past tasks</option>
+				</select>
+				<input type="submit" name="action" value="apply filter" />
+			</form>
+		</div>
+
+		<table class="list" cellspacing="0">
+			<tr class="header_row">
+				<td>Status</td>
+				<td>User</td>
+				<td>Task</td>
+				<td>Schedule Date</td>
+				<td>Completed?</td>
+			</tr>
+
+			{% for task in tasks %}
+			<tr class="{% cycle 'normal' 'alt' %}">
+				<td><div class="task_status {{ task.get_status }}">{{ task.get_status }}</span></td>
+				<td>{{ task.user.address }}</td>
+				<td>{{ task.task.name }}</td>
+				<td>{{ task.schedule_date|date:"n/d/Y g:i A" }}</td>
+				<td>{{ task.completed }}</td>
+			</tr>
+			{% empty %}
+			<tr class="empty">
+				<td colspan="5">no tasks found</td>
+			</tr>
+			{% endfor %}
+		</table>
+
+		<div style="text-align: right; width: 600px;">
+			<a href="javascript:refreshForm()">refresh</a>
+		</div>
+	</div>
+
+	<div class="header">&#149; schedule a new task:</div>
+	<div class="section">
+		<form id="scheduler_form" action="{% url taskmanager.views.add_scheduled_task %}" method="POST">{% csrf_token %}
+			{% if error_msg %}
+			<div class="errorbox">
+				<b>error:</b> {{ error_msg }}
+			</div>
+			{% endif %}
+
+			<table class="vertical">
+				<tr><td class="label">Task:</td><td>
+					<select class="dropper" name="task">
+					{% for task in machines %}
+						<option value="{{ task.id }}">{{ task.name }}</option>
+					{% endfor %}
+					</select>
+				</td></tr>
+
+				<tr><td class="label">User:</td><td>
+					<select class="dropper" name="user">
+					{% for user in users %}
+						<option value="{{ user.id }}">{{ user.address }}</option>
+					{% endfor %}
+					</select>
+				</td></tr>
+
+				<tr><td class="label">Date:</td><td>
+					<input type="text" id="date_picker" name="date">
+					<input type="text" id="time_picker" name="time">
+				</td></tr>
+
+				<tr><td class="label">&nbsp;</td><td align="right"><input type="submit" name="schedule" value="Schedule"></td></tr>
+			</table>
+		</form>
+
+		<div style="clear: both;"></div>
+	</div>
+{% endblock %}

@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+
+<html>
+	<head>
+		<title>Task Manager :: {% block title %}{% endblock %}</title>
+
+		<script type="text/javascript" src="/static/taskmanager/jquery-1.4.2.min.js"></script>
+		<script type="text/javascript" src="/static/taskmanager/jquery.calendrical.js"></script>
+
+		<link rel="stylesheet" type="text/css" href="/static/taskmanager/calendrical.css" />
+
+		<link rel="stylesheet" type="text/css" href="/static/taskmanager/taskmanager.css" />
+
+		<style>
+		{% block styles %}{% endblock %}
+		</style>
+
+		<script type="text/javascript">
+		{% block scripts %}{% endblock %}
+		</script>
+	</head>
+
+	<body>
+		<h1>{% block header %}{% endblock %}</h1>
+
+		{% block content %}{% endblock %}
+	</body>
+</html>

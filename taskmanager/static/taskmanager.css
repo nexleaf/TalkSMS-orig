@@ -1,0 +1,31 @@
+body { margin: 0px; }
+body, table { font-family: Tahoma, sans-serif; font-size: 13px; }
+.header { font-weight: bold; background: #ddd; padding: 10px; margin-bottom: 1em; }
+
+h1 { margin-left: 20px; font-size: 32px; }
+
+.section { margin-left: 30px; margin-bottom: 1em; }
+
+.info_panel { margin-bottom: 1em; }
+
+.vertical { margin-bottom: 1em; }
+.vertical .label { font-weight: bold; }
+.vertical td { padding: 5px; }
+
+.list { width: 600px; border: solid 1px #ddd; margin-bottom: 1em; }
+.list td { padding: 5px; }
+.list tr.header_row td { background: #555; color: white; font-weight: bold; }
+
+.list tr.normal td { }
+.list tr.alt td { background: #eee; }
+.list tr.empty td { font-style: italic; }
+
+.task_status { font-weight: bold; color: #555; width: 60px; padding: 3px; text-align: center; border-radius: 4px; -moz-border-radius: 4px; }
+.task_status.pending { background: #E3E383; }
+.task_status.due { background: #E3B5B5; }
+.task_status.past { background: #BBE3B5; }
+
+.dropper { width: 100%; }
+
+.errorbox { color: red; margin-bottom: 1em; }
+.invalid_field { border: solid 2px red; }
