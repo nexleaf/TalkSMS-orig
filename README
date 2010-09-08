@@ -1,0 +1,23 @@
+
+8/23/2010: 
+
+install:
+* install rapidsms-core-dev:  http://github.com/rapidsms/rapidsms-core-dev
+* %rapidsms-admin.py startproject <project root>
+* %git clone git://github.com/nexleaf/TalkSMS <project root>
+
+run:
+* %cd <project root>
+* %./manage.py syncdb
+* %./manage.py scheduler
+* %./manage.py runrouter
+* %./manage.py runserver
+
+
+use: 
+* http://localhost:8000/admin/taskmanager; add users, tasks
+* http://localhost:8000/taskmanager; schedule tasks... 
+
+
+notes: 
+* updated rapidsms-core-dev: 8/25

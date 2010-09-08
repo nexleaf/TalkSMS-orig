@@ -3,13 +3,19 @@
 import sms
 
 from datetime import datetime, timedelta
+import re, json
 
 class AppointmentTree(object):
     def __init__(self, user, drname='your doctor'):
 
-        # assume user is a user obj; drname is a string.
         self.drname = drname
-        self.user = user
+
+        if isinstance (user, (str, unicode)):
+            self.user = sms.finduser(user)
+        elif isinstance(user, sms.User):
+            self.user = user
+        else:
+            raise ValueError('unknown user: %s' % (user))
 
         # define the interaction
         # ask if they have an appointment
@@ -44,7 +50,7 @@ class AppointmentTree(object):
         five_days = timedelta(days=5)
         timestr=(t+five_days).isoformat()
         
-        d ={'task':'appointment tree', 'user':self.user, 'args':self.drname, 'schedule_date':timestr}
+        d ={'task':self.__class__.__name__, 'user':self.user.email, 'args':self.drname, 'schedule_date':timestr}
         pf=[('sarg', json.dumps(d))]
         
         try: 
@@ -60,7 +66,7 @@ class AppointmentTree(object):
         one_day = timedelta(days=1)
         timestr = (t-one_day).isoformat()
 
-        d ={'task':'appointment tree', 'user':self.user, 'args':self.drname, 'schedule_date':timestr}
+        d ={'task':self.__class__.__name__, 'user':self.user.email, 'args':self.drname, 'schedule_date':timestr}
         pf=[('sarg', json.dumps(d))]
 
         try:

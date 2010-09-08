@@ -26,7 +26,6 @@ class Response(object):
         return '%s:%s' % (self.__class__.__name__, (self.label if self.label else repr(self) ))
 
 
-
 class Message(object):
 
     def __init__(self, question, responselist=[], autoresend=0, label=''):
@@ -115,20 +114,28 @@ class Interaction(object):
         return string
 
 
-
 class User(object):
 
     MAXMSGID = 99
     
-    def __init__(self, email=None, phone=None, username=None, label=None):
+    def __init__(self, identity=None, firstname=None, lastname=None, label=None):
         # handy?
         #for k,v in attributes.iteritems():
         #    setattr(self,k,v)
-        if (phone is None) and (email is None):
+        if identity is None:
             raise ValueError("Phone number or email required.")
-        self.email=email
-        self.phone = phone
-        self.username=username
+        elif re.match(r'.+@.+', identity):
+            self.identity = identity
+            self.identityType = 'email'
+        elif re.match(r'^\d+', self.identity):
+            self.identity = identity
+            self.identityType = 'phone'
+        else:
+            raise ValueError("Unknown identity type.")
+
+        self.firstname = firstname
+        self.lastname = lastname
+
         if label is None:
             self.label = self.__class__.__name__
         else:
@@ -136,7 +143,11 @@ class User(object):
 
         # possible memory hog when msgid is large
         self.msgid = itertools.cycle(range(User.MAXMSGID+1))
-    
+
+    @property
+    def username(self):
+        return self.firstname + ' ' + self.lastname
+        
 
 class StateMachine(object):
       """
@@ -145,7 +156,7 @@ class StateMachine(object):
       # max number of times a message is sent when expecting a reply
       MAXSENTCOUNT = 3
       # time to resend a message in minutes
-      TIMEOUT = 2
+      TIMEOUT = 15
       
       def __init__(self, app, user, interaction, label=''):
           self.app = app
@@ -184,8 +195,8 @@ class StateMachine(object):
                        'minutes':StateMachine.TIMEOUT,
                        'repetitions':StateMachine.MAXSENTCOUNT,
                        'msgid':self.msgid,
-                       'identity':self.user.email }                 
-                  self.app.schedulecallback(d)
+                       'identity':self.user.identity }                 
+                  self.app.schedule_response_reminders(d)
 
               self.node.sentcount += 1
           else:
@@ -222,7 +233,9 @@ class StateMachine(object):
               response = self.node.responselist[i]
               # call response obj's developer defined callback
               if hasattr(response, 'callback'):
-                  log.debug('calling callback defined in %s' % (response))
+                  self.log.debug('calling callback defined in %s' % (response))
+                  response.args = []
+                  response.kwargs = {'response':rnew}
                   result = response.callback(*response.args, **response.kwargs)
                   self.log.debug('callback result: %s.' % (result))
               # advance to the next node
@@ -280,10 +293,10 @@ class TaskManager(object):
         c = pycurl.Curl()
         c.setopt(c.URL, 'http://localhost/schedule')
         c.setopt(c.PORT, 8080)
-        print 'wazup'
+        print 'in TaskManager.schedule(): about to post'
         c.setopt(c.HTTPPOST, pf)
-        print 'kbiethx'
-        c.setopt(c.VERBOSE, 1)
+        print 'in TaskManager.schedule():'
+        c.setopt(c.VERBOSE, 0)
         c.perform()
         c.close()
 
@@ -322,9 +335,9 @@ class TaskManager(object):
           s += '\nPlease prepend response with message id: \"%d\".\n' % (msgid)
         return s
                 
-    # the first send is app.start() -> tm.run() -> sm.step() -> app.send().
+    # the first send is app.start() -> tm.run() -> sm.kick() -> app.send().
     # then each message is received (or ping-ponged back and forth)
-    # by app.handle() -> app.recv() -> sm.step() which
+    # by app.handle() -> app.recv() -> sm.kick() which
     # returns a string, 'response' along the same route.     
     def send(self, statemachine):
         # it's very wrong to be updating the msgid outside of the statemachine.
@@ -333,7 +346,7 @@ class TaskManager(object):
         # statemachine.msgid = statemachine.user.msgid.next()
         s = TaskManager.build_send_str(statemachine.node, statemachine.msgid)
         self.log.info('in TaskManager.send(): preparing to send s: %s' % s)
-        self.app.send(statemachine.user.email, s)
+        self.app.send(statemachine.user.identity, s)
 
         
     def recv(self, rmessage):
@@ -367,12 +380,12 @@ class TaskManager(object):
                       'rmsgid: \'%s\'; rtext: \'%s\'; peer: \'%s\'' % (rmsgid, rtext, rmessage.peer))           
             # find the correct statemachine
             for sm in self.uism:
-                self.log.debug('sm.user.email: \'%s\'; rmessage.peer: \'%s\'; sm.msgid: \'%s\'; rmsgid: \'%s\'' %\
-                          (sm.user.email, rmessage.peer, sm.msgid, rmsgid))
-                self.log.debug('sm.user.email==rmessage.peer -> %s; sm.msgid==int(rmsgid) -> %s' %\
-                          (sm.user.email==rmessage.peer, sm.msgid==int(rmsgid)))
+                self.log.debug('sm.user.identity: \'%s\'; rmessage.peer: \'%s\'; sm.msgid: \'%s\'; rmsgid: \'%s\'' %\
+                          (sm.user.identity, rmessage.peer, sm.msgid, rmsgid))
+                self.log.debug('sm.user.identity==rmessage.peer -> %s; sm.msgid==int(rmsgid) -> %s' %\
+                          (sm.user.identity==rmessage.peer, sm.msgid==int(rmsgid)))
 
-                if (sm.user.email == rmessage.peer):
+                if (sm.user.identity == rmessage.peer):
                     if (sm.msgid == int(rmsgid)):
                         self.log.debug('found sm')
                         sm.kick(rtext)

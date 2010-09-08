@@ -6,8 +6,13 @@ from datetime import datetime, timedelta
 import rapidsms
 import rapidsms.contrib.scheduler.app as sched
 from rapidsms.contrib.scheduler.models import EventSchedule, ALL
+
 import tasks.sms as sms
 import tasks.appt_tree
+import tasks.appointment_request
+import tasks.appointment_reminder
+import tasks.appointment_followup
+
 
 from taskmanager.models import *
 
@@ -20,12 +25,10 @@ class App (rapidsms.apps.base.AppBase):
         self.debug('start time: %s', datetime.now())
 
     def handle (self, message):
-        self.debug('in App.handle(): message type: %s, message.text: %s', type(message),  message.text)        
+        self.debug('in App.handle(): message type: %s, message.text: %s', type(message),  message.text)
         response = self.tm.recv(message)
-        self.debug("responding: %s", response)
+        self.debug("message.subject: %s; responding: %s", message.subject, response)
         message.respond(response)
-        return True
-
 
     def send(self, ident, s):
         self.debug('in App.send():')
@@ -33,15 +36,15 @@ class App (rapidsms.apps.base.AppBase):
             from rapidsms.models import Backend 
             bkend, createdbkend = Backend.objects.get_or_create(name="email")        
             conn, createdconn = rapidsms.models.Connection.objects.get_or_create(backend=bkend, identity=ident)
-            message = rapidsms.messages.outgoing.OutgoingMessage(connection=conn, template=s)
-            message.subject = 'testing %s' % (self.__class__)
+            message = rapidsms.messages.outgoing.OutgoingMessage(conn, s)
+            message.subject='testing '+ str(self.__class__)
             if message.send():
                 self.debug('sent message.text: %s', s)
-        except:
-            self.debug('problem sending outgoing message: createdbkend?:%s; createdconn?:%s', createdbkend, createdconn)
+        except Exception as e:
+            self.debug('problem sending outgoing message: createdbkend?:%s; createdconn?:%s; exception: %s', createdbkend, createdconn, e)
 
-
-    def schedulecallback(self, d):
+    # just schedules reminder to respond messages...it needs a better name
+    def schedule_response_reminders(self, d):
         self.debug('in App.schedulecallback(): self.router: %s', self.router)
         cb = d.pop('callback')
         m = d.pop('minutes')
@@ -58,8 +61,7 @@ class App (rapidsms.apps.base.AppBase):
             self.debug('scheduling a reminder to fire between [%s, %s]', st, et)
             schedule = EventSchedule(callback=cb, minutes=ALL, callback_kwargs=d, start_time=st, end_time=et)
             schedule.save()               
-      
-        
+              
     def resend(self, msgid=None, identity=None):
         self.debug('in App.resend():')        
         statemachine = self.findstatemachine(msgid, identity)
@@ -75,17 +77,15 @@ class App (rapidsms.apps.base.AppBase):
             if (sm.node.sentcount < sms.StateMachine.MAXSENTCOUNT):
                 sm.node.sentcount += 1
                 self.debug('sm.node.sentcount incremented to: %s', sm.node.sentcount)
-                s = sms.TaskManager.build_send_str(cn, sm.msgid)
-                self.send(sm.user.email, s)
+                self.tm.send(statemachine)
         
 
     # move to sms.Taskmanager
     def findstatemachine(self, msgid, identity):
-        """finds statemachine machine matching"""
         self.debug('in App.findstatemachine(): msgid:%s, identity: %s', msgid, identity)
         cl = []
         for sm in self.tm.uism:
-            if (sm.msgid == msgid) and (sm.user.email == identity):
+            if (sm.msgid == msgid) and (sm.user.identity == identity):
                 cl.append(sm)
                 
         if len(cl) > 1:
@@ -102,25 +102,18 @@ class App (rapidsms.apps.base.AppBase):
         return statemachine
         
     # move to TaskManager.finduser()
-    def finduser(self, ident):
-        # look up the equivalent user in the sms userlist.
-        # shouln't really be looking at uism...
+    def finduser(self, identity=None, firstname=None, lastname=None):
+        """find or create user"""
+        # should be a db look up
         for statemachine in self.tm.uism:
-            if statemachine.user.email in ident:
+            if statemachine.user.identity in identity:
                 return statemachine.user
 
-        if isinstance(ident, unicode):
-            ident = str(ident)
-        if isinstance(ident, str):
-            at = re.compile('.+@.+')
-            try:
-                e=at.match(ident).group()
-                user = sms.User(email=e)
-            except:
-                user = None
-                # TODO: match cell number
-                # ident will be abstracted away from email to include, cell,...
-                self.error('could not find user by email')
+        try:
+            user = sms.User(identity=identity, firstname=firstname, lastname=lastname)
+        except Exception as e:
+            user = None
+            self.error('Could not create user using identity: %s; Exception: %s', identity, e)
         return user
         
 
@@ -133,19 +126,19 @@ class App (rapidsms.apps.base.AppBase):
 
 
     def ajax_POST_exec(self, getargs, postargs=None):
-        self.debug("ASDKGJASLKIDGHLK")
+        self.debug("in app.ajax_POST_exec:")
         task = Task.objects.get(pk=postargs['task'])
         user = User.objects.get(pk=postargs['user'])
         args = json.loads(postargs['arguments'])
 
-        smsuser = self.finduser(user.address)
+        smsuser = self.finduser(user.address, user.first_name, user.last_name)
         module = '%s.%s' % (task.module, task.className)
         print module
         print type(module)
         if not args:
             t = eval(module)(smsuser)
         else:
-            t = eval(module)(smsuser,args)
+            t = eval(module)(smsuser, args)
 
         # TODO: move this to TaskManager.createtask()
         #       or TaskManager.starttask() or something similar
@@ -155,6 +148,7 @@ class App (rapidsms.apps.base.AppBase):
         self.tm.run()
 
         return {'status': 'OK'}
+
 
 def callresend(router, **kwargs):
     from datetime import datetime
