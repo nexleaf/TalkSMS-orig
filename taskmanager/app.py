@@ -130,7 +130,8 @@ class App (rapidsms.apps.base.AppBase):
         task = Task.objects.get(pk=postargs['task'])
         user = User.objects.get(pk=postargs['user'])
         args = json.loads(postargs['arguments'])
-
+        print 'printing args: %s; type: %s' % (args, type(args))
+        
         smsuser = self.finduser(user.address, user.first_name, user.last_name)
         module = '%s.%s' % (task.module, task.className)
         print module

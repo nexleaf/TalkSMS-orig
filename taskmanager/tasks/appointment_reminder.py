@@ -8,21 +8,15 @@ import json, re
 class AppointmentReminder(object):
     def __init__(self, user, *args):
 
-        if args:
-            l = args[0]
+        print 'in appointment reminder: args: %s' % args
+        args = eval(args[0])
+        print 'in appointment reminder: args: %s' % args
         
-        print args
-        args = json.JSONDecoder().decode(args)
-        print args
-
+        assert(isinstance(args, list))
         print 'args: %s; args[0]:%s; args[1]:%s' % (args, args[0], args[1])
         self.drname = args[0]
-        self.appttime = datetime.strptime(args[1], "%Y-%m-%dT%H:%M:%S.%f")
+        self.appttime = datetime.strptime(args[1], "%Y-%m-%dT%H:%M:%S")
             
-        #else:
-        #    self.drname = 'your doctor'
-        #    self.appttime = None
-
         if isinstance(user, sms.User):
             self.user = user
         else:
@@ -35,10 +29,9 @@ class AppointmentReminder(object):
                 Otherwise, if you would like to cancel the appointment,
                 reply 'cancel' or 'no'.""".format(firstname=self.user.firstname, drname=self.drname, date=self.appttime)
         r1 = sms.Response('ok', r'ok|OK|Ok')
-        r2 = sms.Response('12/31/2012 15:30', r'\d+/\d+/\d+\s\d+:\d+:\d+', callback=self.reschedule)
-        r3 = sms.Response('cancel' r'cancel|no', callback=self.cancel)
+        r2 = sms.Response('12/31/2012 15:30:00', r'\d+/\d+/\d+\s\d+:\d+:\d+', callback=self.reschedule)
+        r3 = sms.Response('cancel', r'cancel|no', callback=self.cancel)
         m1 = sms.Message(q1, [r1,r2,r3])
-        print 'in tasks.appointment_tree.schedule_appointment: user responsed with date: %' % (response)
     
         # m2
         q2 = 'Great, see you then.'
@@ -61,8 +54,8 @@ class AppointmentReminder(object):
 
     def reschedule(self, *args, **kwargs):
         ndatetime = kwargs['response']
-        assert(re.match(r'\d+/\d+/\d+\s\d+:\d+:\d+', ndatetime) is not None)
-        print 'in %s.%s: user responsed with date: %s' % (self.__class__, self.__class__.__name__, response)
+        assert(re.match(r'\d+/\d+/\d+.\d+:\d+:\d+', ndatetime) is not None)
+        print 'in %s.%s: user responsed with date: %s' % (self.__class__, self.__class__.__name__, kwargs['response'])
 
         # find old appointment and cancel
         # search appointment calendar for the nearest open appointment returning datetime (ndatetime used here)

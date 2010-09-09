@@ -20,11 +20,11 @@ class AppointmentRequest(object):
 
         # m1
         q1 = """Hello {firstname}, you're due for a checkup with {drname} soon.
-                If you would like to schedule one now, text me back a preferred date and time like this (mm/dd/yyyy hh:ss).
+                If you would like to schedule one now, text me back a preferred date and time like this (mm/dd/yyyy hh:mm:ss).
                 Or respond with 'no' if you don't want to
                 schedule anything now.""".format(firstname=self.user.firstname, drname=self.drname)
         r1 = sms.Response('no', r'n|N', 'no')
-        r2 = sms.Response('8/30/2010 16:30', r'\d+/\d+/\d+\s\d+:\d+', label='datetime', callback=self.schedule_new_appointment)
+        r2 = sms.Response('8/30/2010 16:30:00', r'\d+/\d+/\d+\s\d+:\d+:\d+', label='datetime', callback=self.schedule_new_appointment)
         m1 = sms.Message(q1, [r1,r2])
 
         # m2
